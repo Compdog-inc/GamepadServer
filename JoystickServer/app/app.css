@@ -1,0 +1,29 @@
+.joystick {
+    position: fixed;
+    width: 200px;
+    height: 200px;
+}
+
+.joystick.left {
+    left: 20px;
+    top: calc(50% - 100px);
+}
+
+.joystick.right {
+    right: 20px;
+    top: calc(50% - 100px);
+}
+
+.joystick.left2 {
+    left: 20px;
+    top: 0;
+    width: 100px;
+    height: 100px;
+}
+
+.joystick.right2 {
+    right: 20px;
+    top: 0;
+    width: 100px;
+    height: 100px;
+}
