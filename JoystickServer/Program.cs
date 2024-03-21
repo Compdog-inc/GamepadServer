@@ -1,6 +1,8 @@
 ﻿using JoystickServer;
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets;
+using System.Net;
+using System.Net.Sockets;
 
 WebServer server = new();
 
@@ -24,6 +26,15 @@ WebServer.JoystickClient.ClientRemoved += (s, e) =>
 
 Console.WriteLine("[Server]: Starting");
 server.Start();
+
+var host = await Dns.GetHostEntryAsync(Dns.GetHostName());
+foreach (var ip in host.AddressList)
+{
+    if (ip.AddressFamily == AddressFamily.InterNetwork)
+    {
+        Console.WriteLine("[Server] listening on http://" + ip.ToString()+":"+server.Port+"/app/index.html");
+    }
+}
 
 Console.WriteLine("[Server]: Press any key to exit");
 Console.ReadLine();

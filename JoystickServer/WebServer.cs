@@ -8,8 +8,11 @@ namespace JoystickServer
 {
     internal class WebServer
     {
-        public static bool Verbose = true;
+        public static bool Verbose = false;
         public const int ConnectionTimeout = 5000;
+
+        public string Address => ws.Address;
+        public int Port => ws.Port;
 
         public class JoystickClientEventArgs : EventArgs
         {
