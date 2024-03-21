@@ -69,6 +69,26 @@ namespace JoystickServer
                 return data?["tr"]?.GetValue<byte>() ?? 0;
             }
 
+            public bool GetButtonY()
+            {
+                return data?["by"]?.GetValue<bool>() ?? false;
+            }
+
+            public bool GetButtonB()
+            {
+                return data?["bb"]?.GetValue<bool>() ?? false;
+            }
+
+            public bool GetButtonA()
+            {
+                return data?["ba"]?.GetValue<bool>() ?? false;
+            }
+
+            public bool GetButtonX()
+            {
+                return data?["bx"]?.GetValue<bool>() ?? false;
+            }
+
             internal JoystickClient(Guid id)
             {
                 Id = id;

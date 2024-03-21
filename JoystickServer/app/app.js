@@ -6,7 +6,9 @@
         if (typeof crypto === 'undefined') {
             crypto = {
                 randomUUID: function () {
-
+                    return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
+                        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                    );
                 }
             };
         } else {
@@ -37,31 +39,35 @@
     };
 
     // Create WebSocket connection.
-    const socket = new WebSocket("ws://" + location.hostname + ":3000");
+    let socket = null;
+    if(location.hostname.length > 0){
+        socket = new WebSocket("ws://" + location.hostname + ":3000");
 
-    // Connection opened
-    socket.addEventListener("open", (event) => {
-        console.log("[INFO]: Socket OPEN");
+        // Connection opened
+        socket.addEventListener("open", (event) => {
+            console.log("[INFO]: Socket OPEN");
 
-        try {
-            const cid = getCid();
-            console.log("[INFO]: Sending CID '" + cid + "'");
-            socket.send("CID" + cid);
-        } catch (e) {
-            alert("Error connecting!\n" + e);
-        }
-    });
+            try {
+                const cid = getCid();
+                console.log("[INFO]: Sending CID '" + cid + "'");
+                socket.send("CID" + cid);
+            } catch (e) {
+                alert("Error connecting!\n" + e);
+            }
+        });
 
-    // Listen for messages
-    socket.addEventListener("message", (event) => {
-        const data = JSON.parse(event.data);
-        console.log("[SERVER]", data);
-    });
+        // Listen for messages
+        socket.addEventListener("message", (event) => {
+            const data = JSON.parse(event.data);
+            console.log("[SERVER]", data);
+        });
+    }
 
     let globalData = {};
 
     const sendData = () => {
-        socket.send(JSON.stringify(globalData));
+        if(socket != null)
+            socket.send(JSON.stringify(globalData));
     };
 
     window.addEventListener('load', () => {
@@ -92,6 +98,23 @@
             const x = Math.max(-1, Math.min(1, data.x / 100.0));
             const y = Math.max(-1, Math.min(1, data.y / 100.0));
             globalData.tr = Math.floor(Math.abs(y) * 255);
+            sendData();
+        });
+
+        const btnY = new ControllerButton('by', "Y", BTN_YELLOW, (data)=>{
+            globalData.by = data.pressed;
+            sendData();
+        });
+        const btnB = new ControllerButton('bb', "B", BTN_RED, (data)=>{
+            globalData.bb = data.pressed;
+            sendData();
+        });
+        const btnA = new ControllerButton('ba', "A", BTN_GREEN, (data)=>{
+            globalData.ba = data.pressed;
+            sendData();
+        });
+        const btnX = new ControllerButton('bx', "X", BTN_BLUE, (data)=>{
+            globalData.bx = data.pressed;
             sendData();
         });
     });

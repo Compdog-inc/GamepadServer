@@ -1,6 +1,7 @@
 ﻿using JoystickServer;
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets;
+using Nefarius.ViGEm.Client.Targets.Xbox360;
 using System.Net;
 using System.Net.Sockets;
 
@@ -93,8 +94,14 @@ class ClientDriver : IDisposable
                     controller.SetAxisValue(1, client.GetLeftY());
                     controller.SetAxisValue(2, client.GetRightX());
                     controller.SetAxisValue(3, client.GetRightY());
+
                     controller.SetSliderValue(0, client.GetTriggerLeft());
                     controller.SetSliderValue(1, client.GetTriggerRight());
+
+                    controller.SetButtonState(Xbox360Button.Y, client.GetButtonY());
+                    controller.SetButtonState(Xbox360Button.B, client.GetButtonB());
+                    controller.SetButtonState(Xbox360Button.A, client.GetButtonA());
+                    controller.SetButtonState(Xbox360Button.X, client.GetButtonX());
 
                     controller.SubmitReport();
                     await Task.Delay(1, tokenSource.Token);
