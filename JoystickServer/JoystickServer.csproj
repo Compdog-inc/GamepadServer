@@ -20,6 +20,9 @@
     <None Update="app\app.js">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="app\button.min.js">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="app\index.html">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

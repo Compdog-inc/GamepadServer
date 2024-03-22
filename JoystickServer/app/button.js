@@ -24,7 +24,8 @@ class ControllerButton {
         this.evt = evt;
         this.isPressed = false;
 
-        const down = ()=>{
+        const down = (e)=>{
+            e.preventDefault();
             this.isPressed = true;
             this.evt({
                 pressed:true
@@ -32,7 +33,9 @@ class ControllerButton {
             this.render();
         };
 
-        const up = ()=>{
+        const up = (e)=>{
+            if(this.isPressed)
+                e.preventDefault();
             this.isPressed = false;
             this.evt({
                 pressed:false
@@ -41,7 +44,9 @@ class ControllerButton {
         };
 
         canvas.addEventListener('pointerdown', down);
-        canvas.addEventListener('pointerup', up);
+        canvas.addEventListener('touchstart', down);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('touchend', up);
 
         elem.appendChild(canvas);
 
