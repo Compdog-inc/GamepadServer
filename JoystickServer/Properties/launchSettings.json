@@ -1,0 +1,23 @@
+{
+  "profiles": {
+    "WSL": {
+      "commandName": "WSL2",
+      "distributionName": ""
+    },
+    "Verbose": {
+      "commandName": "Project",
+      "commandLineArgs": "--verbose"
+    },
+    "Default": {
+      "commandName": "Project"
+    },
+    "Help": {
+      "commandName": "Project",
+      "commandLineArgs": "--help"
+    },
+    "Hot Reload": {
+      "commandName": "Project",
+      "commandLineArgs": "--hot-reload ../../../app --verbose"
+    }
+  }
+}

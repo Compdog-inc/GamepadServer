@@ -8,9 +8,6 @@ namespace JoystickServer
 {
     internal class WebServer
     {
-        public static bool Verbose = false;
-        public const int ConnectionTimeout = 5000;
-
         public string Address => ws.Address;
         public int Port => ws.Port;
 
@@ -34,6 +31,8 @@ namespace JoystickServer
 
             public static event EventHandler<JoystickClientEventArgs>? ClientAdded;
             public static event EventHandler<JoystickClientEventArgs>? ClientRemoved;
+
+            private int connectionTimeout;
 
             private JsonNode? data;
             private bool dirty = false;
@@ -89,8 +88,9 @@ namespace JoystickServer
                 return data?["bx"]?.GetValue<bool>() ?? false;
             }
 
-            internal JoystickClient(Guid id)
+            internal JoystickClient(Guid id, int connectionTimeout)
             {
+                this.connectionTimeout = connectionTimeout;
                 Id = id;
                 lock (Clients)
                 {
@@ -123,7 +123,7 @@ namespace JoystickServer
                     {
                         try
                         {
-                            await Task.Delay(ConnectionTimeout, dirtySource.Token);
+                            await Task.Delay(connectionTimeout, dirtySource.Token);
                         }
                         catch { return; }
                         if (!dirtySource.Token.IsCancellationRequested)
@@ -135,26 +135,27 @@ namespace JoystickServer
                                     Clients.Remove(Id);
                                     ClientRemoved?.Invoke(this, new JoystickClientEventArgs(Id, null));
                                 }
-                            }catch { return; }
+                            }
+                            catch { return; }
                         }
                     }, dirtySource.Token).Start();
                 }
             }
         }
 
-        class JoystickWsSession(WsServer server) : WsSession(server)
+        class JoystickWsSession(WsServer server, bool verbose, int connectionTimeout) : WsSession(server)
         {
             public JoystickClient? Client { get; private set; }
 
             public override void OnWsConnected(HttpRequest request)
             {
-                if(Verbose)
+                if (verbose)
                     Console.WriteLine($"[Socket]: {Id} connected");
             }
 
             public override void OnWsDisconnected()
             {
-                if(Verbose)
+                if (verbose)
                     Console.WriteLine($"[Socket]: {Id} disconnected");
 
                 if (Client != null)
@@ -173,18 +174,34 @@ namespace JoystickServer
                 {
                     if (Guid.TryParse(message[3..], out Guid uuid))
                     {
+                        if (verbose)
+                        {
+                            Console.WriteLine($"[Socket]: Received CID '{uuid}'");
+                            if (Client != null)
+                                Console.WriteLine("[Socket]: Internal state already connected! Marking previous CID as dirty.");
+                        }
+
                         Client?.DisconnectInstance();
 
                         if (JoystickClient.Clients.TryGetValue(uuid, out JoystickClient? value))
                         {
+                            if (verbose)
+                                Console.WriteLine("[Socket]: Client already axists, adding instance.");
+
                             Client = value;
                             Client.ConnectInstance();
                         }
                         else
                         {
-                            Client = new JoystickClient(uuid);
+                            if (verbose)
+                                Console.WriteLine("[Socket]: Creating new client");
+                            Client = new JoystickClient(uuid, connectionTimeout);
                         }
                         return;
+                    }
+                    else if (verbose)
+                    {
+                        Console.WriteLine($"[Socket]: Invalid CID received '{message[3..]}'");
                     }
                 }
 
@@ -202,13 +219,9 @@ namespace JoystickServer
             }
         }
 
-        class JoystickWsServer : WsServer
+        class JoystickWsServer(IPAddress address, int port, bool verbose, int connectionTimeout) : WsServer(address, port)
         {
-            public JoystickWsServer(IPAddress address, int port) : base(address, port)
-            {
-            }
-
-            protected override TcpSession CreateSession() { return new JoystickWsSession(this); }
+            protected override TcpSession CreateSession() { return new JoystickWsSession(this, verbose, connectionTimeout); }
 
             protected override void OnError(SocketError error)
             {
@@ -216,17 +229,32 @@ namespace JoystickServer
             }
         }
 
+        FileSystemWatcher? watcher;
         JoystickWsServer ws;
+        bool verbose;
 
-        public WebServer()
+        const string staticRoot = "app";
+
+        public WebServer(bool verbose, int connectionTimeout, int port)
         {
-            ws = new JoystickWsServer(IPAddress.Any, 3000);
-            ws.AddStaticContent("app", "/app");
+            this.verbose = verbose;
+            ws = new JoystickWsServer(IPAddress.Any, port, verbose, connectionTimeout);
+            ws.AddStaticContent(staticRoot, "/app");
         }
 
         public void Start()
         {
-            ws.Start();
+            try
+            {
+                ws.Start();
+            }
+            catch
+            {
+                Console.WriteLine("[Server]: Error Port already in use!");
+                Console.WriteLine("[Server]: Press any key to exit");
+                Console.ReadLine();
+                Environment.Exit(1);
+            }
         }
 
         public void Stop()
@@ -234,6 +262,56 @@ namespace JoystickServer
             ws.DisconnectAll();
             ws.Stop();
             ws.Dispose();
+        }
+
+        public void StartHotReload(DirectoryInfo source)
+        {
+            if (verbose)
+                Console.WriteLine("[Server]: Initializing file system watcher");
+
+            watcher = new FileSystemWatcher(source.FullName);
+            watcher.IncludeSubdirectories = true;
+
+            watcher.Changed += hotReloadEventHandle;
+            watcher.Created += hotReloadEventHandle;
+            watcher.Deleted += hotReloadEventHandle;
+            watcher.Renamed += hotReloadEventHandle;
+
+            watcher.EnableRaisingEvents = true;
+        }
+
+        public void StopHotReload()
+        {
+            if (watcher != null)
+            {
+                watcher.EnableRaisingEvents = false;
+                watcher.Dispose();
+            }
+        }
+
+        private void hotReloadEventHandle(object sender, FileSystemEventArgs e)
+        {
+            if (watcher == null)
+                return;
+
+            string path = Path.GetRelativePath(watcher.Path, e.FullPath);
+            if (verbose)
+                Console.WriteLine($"[Server]: detected change at '{path}'");
+
+            switch (e.ChangeType)
+            {
+                case WatcherChangeTypes.Created:
+                    if (File.Exists(e.FullPath))
+                        File.Copy(e.FullPath, Path.Join(staticRoot, path), true);
+                    break;
+                case WatcherChangeTypes.Deleted:
+                    File.Delete(Path.Join(staticRoot, path));
+                    break;
+                case WatcherChangeTypes.Changed:
+                    if (File.Exists(e.FullPath))
+                        File.Copy(e.FullPath, Path.Join(staticRoot, path), true);
+                    break;
+            }
         }
     }
 }

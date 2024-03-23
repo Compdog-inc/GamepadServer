@@ -1,128 +1,73 @@
 ﻿using JoystickServer;
-using Nefarius.ViGEm.Client;
-using Nefarius.ViGEm.Client.Targets;
-using Nefarius.ViGEm.Client.Targets.Xbox360;
 using System.Net;
 using System.Net.Sockets;
 
-WebServer server = new();
-
-ClientDriver.Initialize();
-
-Dictionary<Guid, ClientDriver> clients = new Dictionary<Guid, ClientDriver>();
-
-WebServer.JoystickClient.ClientAdded += (s, e) =>
+namespace JoystickServer
 {
-    Console.WriteLine("[Client]: " + e.Id + " connected");
-    if(e.Client != null)
-        clients.Add(e.Id, new ClientDriver(e.Client));
-};
-
-WebServer.JoystickClient.ClientRemoved += (s, e) =>
-{
-    Console.WriteLine("[Client]: " + e.Id + " disconnected");
-    if (clients.Remove(e.Id, out ClientDriver? client))
-        client.Dispose();
-};
-
-Console.WriteLine("[Server]: Starting");
-server.Start();
-
-var host = await Dns.GetHostEntryAsync(Dns.GetHostName());
-foreach (var ip in host.AddressList)
-{
-    if (ip.AddressFamily == AddressFamily.InterNetwork)
+    /// <summary>
+    /// This is the main program
+    /// </summary>
+    public static class Program
     {
-        Console.WriteLine("[Server] listening on http://" + ip.ToString()+":"+server.Port+"/app/index.html");
-    }
-}
-
-Console.WriteLine("[Server]: Press any key to exit");
-Console.ReadLine();
-
-Console.WriteLine("[SERVER]: Stopping");
-server.Stop();
-
-foreach(var client in clients.Values)
-{
-    client.Dispose();
-}
-
-clients.Clear();
-
-ClientDriver.Destroy();
-
-class ClientDriver : IDisposable
-{
-    private static ViGEmClient? driver;
-
-    public static void Initialize()
-    {
-        driver = new();
-    }
-
-    public static void Destroy()
-    {
-        driver?.Dispose();
-    }
-
-    private readonly IXbox360Controller controller;
-    private readonly Task controllerTask;
-    private readonly CancellationTokenSource tokenSource;
-
-    public ClientDriver(WebServer.JoystickClient client)
-    {
-        if(driver == null)
-            throw new ArgumentNullException("ClientDriver.driver");
-
-        tokenSource = new CancellationTokenSource();
-
-        controller = driver.CreateXbox360Controller();
-
-        if(WebServer.Verbose)
-            Console.WriteLine("[Client]: Connecting virtual controller");
-
-        controller.Connect();
-
-        controllerTask = new Task(async () =>
+        /// <summary>
+        /// Starts the gamepad server
+        /// </summary>
+        /// <param name="verbose">When true, additional information is logged to the console.</param>
+        /// <param name="timeout">Specifies the allowed time between connections from the same device when interrupted (ms).</param>
+        /// <param name="port">The port to open the server on.</param>
+        /// <param name="hotReload">Reload</param>
+        /// <returns></returns>
+        public static async Task Main(bool verbose = false, int timeout = 5000, int port = 3000, DirectoryInfo? hotReload = null)
         {
-            while (!tokenSource.Token.IsCancellationRequested)
+            WebServer server = new(verbose, timeout, port);
+            if(hotReload != null)
+                server.StartHotReload(hotReload);
+
+            ClientDriver.Initialize();
+
+            Dictionary<Guid, ClientDriver> clients = [];
+
+            WebServer.JoystickClient.ClientAdded += (s, e) =>
             {
-                try
+                Console.WriteLine("[Client]: " + e.Id + " connected");
+                if (e.Client != null)
+                    clients.Add(e.Id, new ClientDriver(e.Client, verbose));
+            };
+
+            WebServer.JoystickClient.ClientRemoved += (s, e) =>
+            {
+                Console.WriteLine("[Client]: " + e.Id + " disconnected");
+                if (clients.Remove(e.Id, out ClientDriver? client))
+                    client.Dispose();
+            };
+
+            Console.WriteLine("[Server]: Starting");
+            server.Start();
+
+            var host = await Dns.GetHostEntryAsync(Dns.GetHostName());
+            foreach (var ip in host.AddressList)
+            {
+                if (ip.AddressFamily == AddressFamily.InterNetwork)
                 {
-                    controller.SetAxisValue(0, client.GetLeftX());
-                    controller.SetAxisValue(1, client.GetLeftY());
-                    controller.SetAxisValue(2, client.GetRightX());
-                    controller.SetAxisValue(3, client.GetRightY());
-
-                    controller.SetSliderValue(0, client.GetTriggerLeft());
-                    controller.SetSliderValue(1, client.GetTriggerRight());
-
-                    controller.SetButtonState(Xbox360Button.Y, client.GetButtonY());
-                    controller.SetButtonState(Xbox360Button.B, client.GetButtonB());
-                    controller.SetButtonState(Xbox360Button.A, client.GetButtonA());
-                    controller.SetButtonState(Xbox360Button.X, client.GetButtonX());
-
-                    controller.SubmitReport();
-                    await Task.Delay(1, tokenSource.Token);
+                    Console.WriteLine("[Server] listening on http://" + ip.ToString() + ":" + server.Port + "/app/index.html");
                 }
-                catch { return; }
             }
-        }, tokenSource.Token);
 
-        controllerTask.Start();
-    }
+            Console.WriteLine("[Server]: Press any key to exit");
+            Console.ReadLine();
 
-    public void Dispose()
-    {
-        tokenSource.Cancel();
+            Console.WriteLine("[SERVER]: Stopping");
+            server.StopHotReload();
+            server.Stop();
 
-        if (!controllerTask.Wait(1000))
-            Console.WriteLine("[Client]: Controller feedback time out!");
+            foreach (var client in clients.Values)
+            {
+                client.Dispose();
+            }
 
-        if (WebServer.Verbose)
-            Console.WriteLine("[Client]: Disconnecting virtual controller");
+            clients.Clear();
 
-        controller.Disconnect();
+            ClientDriver.Destroy();
+        }
     }
 }
