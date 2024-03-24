@@ -19,7 +19,7 @@ namespace JoystickServer
         /// <returns></returns>
         public static async Task Main(bool verbose = false, int timeout = 5000, int port = 3000, DirectoryInfo? hotReload = null)
         {
-            WebServer server = new(verbose, timeout, port);
+            WebServer server = new(new(verbose, timeout, port, hotReload != null ? 3001 : null));
             if(hotReload != null)
                 server.StartHotReload(hotReload);
 
@@ -49,7 +49,7 @@ namespace JoystickServer
             {
                 if (ip.AddressFamily == AddressFamily.InterNetwork)
                 {
-                    Console.WriteLine("[Server] listening on http://" + ip.ToString() + ":" + server.Port + "/app/index.html");
+                    Console.WriteLine("[Server] listening on https://" + ip.ToString() + ":" + server.Port + "/app/index.html");
                 }
             }
 
